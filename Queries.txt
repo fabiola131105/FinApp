@@ -1,0 +1,108 @@
+Queries
+CREATE TABLE CATEGORIA (
+    CATEGORIAID INT IDENTITY(1,1) PRIMARY KEY,
+    NOMBRE NVARCHAR(50) NOT NULL
+);
+-- Ejemplo de categorías iniciales
+INSERT INTO CATEGORIA (NOMBRE) VALUES
+('Comida'),
+('Transporte'),
+('Plataformas de Streaming'),
+('Renta'),
+('Entretenimiento');
+CREATE TABLE TRANSACCION (
+    Transaccion_ID INT IDENTITY(1,1) PRIMARY KEY,
+    Matricula INT NOT NULL,
+    CategoriaID INT NULL, -- solo obligatorio si es Cargo
+    Monto DECIMAL(10,2) CHECK (MONTO > 0 AND MONTO <= 10000) NOT NULL,
+    Tipo NVARCHAR(10) CHECK (TIPO IN ('Ingreso', 'Cargo')) NOT NULL,
+    Fecha_Hora DATETIME DEFAULT GETDATE() NOT NULL,
+    Descripcion NVARCHAR(25) NULL,
+    Origen NVARCHAR(50) NULL,
+    CONSTRAINT FK_TRANSACCION_USUARIO FOREIGN KEY (Matricula) REFERENCES USUARIO(Matricula),
+    CONSTRAINT FK_TRANSACCION_CATEGORIA FOREIGN KEY (Categoria_ID) REFERENCES CATEGORIA(PK_Categoria_ID),
+    -- Reglas de negocio:
+    CONSTRAINT CK_TRANSACCION_CATEGORIA CHECK (
+        (TIPO = 'Gasto' AND FK_CATEGORIA_ID IS NOT NULL) OR
+        (TIPO = 'Ingreso' AND FK_CATEGORIA_ID IS NULL)
+    ),
+    CONSTRAINT CK_TRANSACCION_ORIGEN CHECK (
+        (TIPO = 'Gasto' AND ORIGEN IS NOT NULL) OR
+        (TIPO = 'Ingreso' AND ORIGEN IS NULL)
+    )
+);
+CREATE TABLE USER (
+    Matricula VARCHAR(20) PRIMARY KEY, 
+    -- Solo letras y números, sin caracteres especiales
+    -- Ejemplo: A12345, user01
+    Nombre NVARCHAR(50) NOT NULL,
+    Apellido NVARCHAR(50) NOT NULL,
+    -- Solo letras y espacio (para nombre y apellido)
+    Email NVARCHAR(100) UNIQUE NOT NULL,
+    -- Debe terminar en @uadec.edu.mx
+    Contra NVARCHAR(8) NOT NULL
+    -- Máximo 8 caracteres
+    -- Debe contener al menos: 1 letra, 1 número y 1 carácter especial
+);
+-- Restricción: Matricula solo letras y números
+ALTER TABLE USER
+ADD CONSTRAINT CK_Matricula_FORMAT 
+CHECK (Matricula NOT LIKE '%[^a-zA-Z0-9]%');
+-- Restricción: NOMBRE solo letras y espacios
+ALTER TABLE USER
+ADD CONSTRAINT CK_NOMBRE_FORMAT 
+CHECK (Nombre NOT LIKE '%[^a-zA-Z ]%');
+-- Restricción: CORREO debe ser de la universidad
+ALTER TABLE USER
+ADD CONSTRAINT CK_CORREO_UADEC 
+CHECK (Email LIKE '%@uadec.edu.mx');
+-- Restricción: CONTRASEÑA debe tener al menos 1 letra, 1 número y 1 carácter especial
+ALTER TABLE USER
+ADD CONSTRAINT CK_CONTRA_COMPLEJIDAD
+CHECK (
+    LEN(Contra) <= 8
+    AND Contra LIKE '%[0-9]%'   -- al menos un número
+    AND Contra LIKE '%[A-Za-z]%' -- al menos una letra
+    AND Contra LIKE '%[^A-Za-z0-9]%' -- al menos un carácter especial
+);
+CREATE TABLE META_AHORRO (
+    PK_MetaID INT IDENTITY(1,1) PRIMARY KEY, 
+    -- Se genera automáticamente en orden desde 1
+    Matricula VARCHAR(20) NOT NULL,
+    -- Relación con el usuario que crea la meta
+    Nombre NVARCHAR(50) NOT NULL,
+    -- Puede ser cualquier texto (números o letras) que el usuario elija
+    Monto_Objetivo DECIMAL(10,2) CHECK (Monto_Objetivo > 0) NOT NULL,
+    -- Monto que el usuario quiere juntar, solo números positivos
+    Monto_Actual DECIMAL(10,2) DEFAULT 0 CHECK (Monto_Actual >= 0) NOT NULL,
+    -- Lo que lleva ahorrado, inicia en 0
+    Fecha_Limite DATE NULL,
+    -- Opcional, si el usuario quiere fijar un plazo
+    Estado NVARCHAR(15) DEFAULT 'Activa' 
+        CHECK (Estado IN ('Activa','Cumplida','Cancelada')) NOT NULL,
+    -- Estado de la meta
+    CONSTRAINT FK_META_USUARIO FOREIGN KEY (Matricula) REFERENCES USER(Matricula)
+);
+CREATE TABLE PRESUPUESTO (
+    PresupuestoID INT IDENTITY(1,1) PRIMARY KEY,
+    
+    Matricula VARCHAR(20) NOT NULL,
+    CategoriaID INT NOT NULL,
+    
+    Monto_Limite DECIMAL(10,2) CHECK (Monto_Limite > 0) NOT NULL,
+    
+    Mes INT NOT NULL DEFAULT (MONTH(GETDATE())),
+    -- Por defecto el mes actual
+    
+    Año INT NOT NULL DEFAULT (YEAR(GETDATE())),
+    -- Por defecto el año actual
+    
+    CONSTRAINT FK_PRESUPUESTO_USER FOREIGN KEY (Matricula) REFERENCES USER(Matricula),
+    CONSTRAINT FK_PRESUPUESTO_CATEGORIA FOREIGN KEY (CategoriaID) REFERENCES CATEGORIA(CategoriaID),
+    
+    CONSTRAINT CK_MES CHECK (Mes BETWEEN 1 AND 12),
+    CONSTRAINT CK_ANO CHECK (Año >= YEAR(GETDATE())),
+    -- El año nunca puede ser menor al actual
+    
+    CONSTRAINT UQ_PRESUPUESTO_UNICO UNIQUE (Matricula, CategoriaID, Mes, Año)
+);
